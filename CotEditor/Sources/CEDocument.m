@@ -233,7 +233,7 @@ NSString *const CEIncompatibleConvertedCharKey = @"convertedChar";
 {
     __block NSURL *newURL = url;
     
-    [self performAsynchronousFileAccessUsingBlock:^(void (^fileAccessCompletionHandler)(void) ) {
+    [self performAsynchronousFileAccessUsingBlock:^(void (^fileAccessCompletionHandler)(void)) {
         // save backup file always in `~/Library/Autosaved Information/` direcotory
         // (The default backup URL is the same directory as the fileURL.)
         if (saveOperation == NSAutosaveElsewhereOperation && [self fileURL]) {
@@ -269,9 +269,7 @@ NSString *const CEIncompatibleConvertedCharKey = @"convertedChar";
     id token = [self changeCountTokenForSaveOperation:saveOperation];
     
     // 保存処理実行
-    @synchronized(self) {
-        success = [self forceWriteToURL:url ofType:typeName forSaveOperation:saveOperation];
-    }
+    success = [self forceWriteToURL:url ofType:typeName forSaveOperation:saveOperation];
     
     if (success) {
         // 新規保存時、カラーリングのために拡張子を保持
@@ -562,10 +560,8 @@ NSString *const CEIncompatibleConvertedCharKey = @"convertedChar";
     [coordinator coordinateReadingItemAtURL:[self fileURL] options:NSFileCoordinatorReadingWithoutChanges
                                       error:nil byAccessor:^(NSURL *newURL)
      {
-         @synchronized(self) {
-             NSDictionary *fileAttrs = [[NSFileManager defaultManager] attributesOfItemAtPath:[newURL path] error:nil];
-             fileModificationDate = [fileAttrs fileModificationDate];
-         }
+         NSDictionary *fileAttrs = [[NSFileManager defaultManager] attributesOfItemAtPath:[newURL path] error:nil];
+         fileModificationDate = [fileAttrs fileModificationDate];
      }];
     if ([fileModificationDate isEqualToDate:[self fileModificationDate]]) { return; }
     
@@ -574,9 +570,7 @@ NSString *const CEIncompatibleConvertedCharKey = @"convertedChar";
     [coordinator coordinateReadingItemAtURL:[self fileURL] options:NSFileCoordinatorReadingWithoutChanges
                                       error:nil byAccessor:^(NSURL *newURL)
      {
-         @synchronized(self) {
-             MD5 = [[NSData dataWithContentsOfURL:newURL] MD5];
-         }
+         MD5 = [[NSData dataWithContentsOfURL:newURL] MD5];
      }];
     if ([MD5 isEqualToString:[self fileMD5]]) {
         // documentの保持しているfileModificationDateを書き換える (2014-03 by 1024jp)
@@ -1083,9 +1077,7 @@ NSString *const CEIncompatibleConvertedCharKey = @"convertedChar";
                                       error:nil
                                  byAccessor:^(NSURL *newURL)
      {
-         @synchronized(self) {
-             attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:[newURL path] error:nil];
-         }
+         attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:[newURL path] error:nil];
      }];
     
     if (attributes) {
@@ -1443,7 +1435,7 @@ NSString *const CEIncompatibleConvertedCharKey = @"convertedChar";
 - (BOOL)forceWriteToURL:(NSURL *)url ofType:(NSString *)typeName forSaveOperation:(NSSaveOperationType)saveOperation
 // ------------------------------------------------------
 {
-    __block BOOL success = NO;
+    BOOL success = NO;
     NSData *data = [self dataOfType:typeName error:nil];
     
     if (!data) { return NO; }
@@ -1466,28 +1458,21 @@ NSString *const CEIncompatibleConvertedCharKey = @"convertedChar";
         return NO;
     }
     
-    NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:self];
-    
     // "authopen" コマンドを使って保存
-    [coordinator coordinateWritingItemAtURL:url options:0
-                                      error:nil
-                                 byAccessor:^(NSURL *newURL)
-     {
-         NSString *convertedPath = @([[newURL path] UTF8String]);
-         NSTask *task = [[NSTask alloc] init];
-         
-         [task setLaunchPath:@"/usr/libexec/authopen"];
-         [task setArguments:@[@"-c", @"-w", convertedPath]];
-         [task setStandardInput:[NSPipe pipe]];
-         
-         [task launch];
-         [[[task standardInput] fileHandleForWriting] writeData:data];
-         [[[task standardInput] fileHandleForWriting] closeFile];
-         [task waitUntilExit];
-         
-         int status = [task terminationStatus];
-         success = (status == 0);
-     }];
+    NSString *convertedPath = @([[url path] UTF8String]);
+    NSTask *task = [[NSTask alloc] init];
+    
+    [task setLaunchPath:@"/usr/libexec/authopen"];
+    [task setArguments:@[@"-c", @"-w", convertedPath]];
+    [task setStandardInput:[NSPipe pipe]];
+    
+    [task launch];
+    [[[task standardInput] fileHandleForWriting] writeData:data];
+    [[[task standardInput] fileHandleForWriting] closeFile];
+    [task waitUntilExit];
+    
+    int status = [task terminationStatus];
+    success = (status == 0);
     
     if (success) {
         if (saveOperation != NSAutosaveElsewhereOperation) {
@@ -1496,12 +1481,7 @@ NSString *const CEIncompatibleConvertedCharKey = @"convertedChar";
         }
         
         // ファイルのメタデータを設定
-        [coordinator coordinateWritingItemAtURL:url options:0
-                                          error:nil
-                                     byAccessor:^(NSURL *newURL)
-         {
-            [[NSFileManager defaultManager] setAttributes:attributes ofItemAtPath:[newURL path] error:nil];
-        }];
+        [[NSFileManager defaultManager] setAttributes:attributes ofItemAtPath:[url path] error:nil];
         
         // ファイル拡張属性 (com.apple.TextEncoding) にエンコーディングを保存
         if ([self shouldSaveXattr]) {
@@ -1511,13 +1491,7 @@ NSString *const CEIncompatibleConvertedCharKey = @"convertedChar";
     
     // Finder Lock がかかってたなら、再びかける
     if (isFinderLockOn) {
-        __block BOOL lockSuccess = NO;
-        [coordinator coordinateWritingItemAtURL:url options:0
-                                          error:nil
-                                     byAccessor:^(NSURL *newURL)
-         {
-             lockSuccess = [[NSFileManager defaultManager] setAttributes:@{NSFileImmutable:@YES} ofItemAtPath:[newURL path] error:nil];
-         }];
+        BOOL lockSuccess = [[NSFileManager defaultManager] setAttributes:@{NSFileImmutable:@YES} ofItemAtPath:[url path] error:nil];
         
         success = (success && lockSuccess);
     }
