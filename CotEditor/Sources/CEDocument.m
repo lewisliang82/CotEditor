@@ -228,31 +228,24 @@ NSString *const CEIncompatibleConvertedCharKey = @"convertedChar";
 
 // ------------------------------------------------------
 /// modify place to create backup file
-- (void)saveToURL:(NSURL *)url ofType:(NSString *)typeName forSaveOperation:(NSSaveOperationType)saveOperation completionHandler:(void (^)(NSError *))completionHandler
+- (void)saveToURL:(NSURL *)url ofType:(NSString *)typeName forSaveOperation:(NSSaveOperationType)saveOperation delegate:(id)delegate didSaveSelector:(SEL)didSaveSelector contextInfo:(void *)contextInfo
 // ------------------------------------------------------
 {
-    __block NSURL *newURL = url;
-    
-    [self performAsynchronousFileAccessUsingBlock:^(void (^fileAccessCompletionHandler)(void)) {
-        // save backup file always in `~/Library/Autosaved Information/` direcotory
-        // (The default backup URL is the same directory as the fileURL.)
-        if (saveOperation == NSAutosaveElsewhereOperation && [self fileURL]) {
-            NSURL *autosaveDirectoryURL =  [[NSFileManager defaultManager] URLForDirectory:NSAutosavedInformationDirectory
-                                                                                  inDomain:NSUserDomainMask
-                                                                         appropriateForURL:nil
-                                                                                    create:YES
-                                                                                     error:nil];
-            NSString *baseFileName = [[self fileURL] lastPathComponent];
-            NSString *fileName = [NSString stringWithFormat:@"%@ (%p)", [baseFileName stringByDeletingPathExtension], self];  // append a unique string to avoid overwriting another backup file with the same file name.
-            
-            newURL = [[autosaveDirectoryURL URLByAppendingPathComponent:fileName] URLByAppendingPathExtension:[baseFileName pathExtension]];
-        }
+    // save backup file always in `~/Library/Autosaved Information/` direcotory
+    // (The default backup URL is the same directory as the fileURL.)
+    if (saveOperation == NSAutosaveElsewhereOperation && [self fileURL]) {
+        NSURL *autosaveDirectoryURL =  [[NSFileManager defaultManager] URLForDirectory:NSAutosavedInformationDirectory
+                                                                              inDomain:NSUserDomainMask
+                                                                     appropriateForURL:nil
+                                                                                create:YES
+                                                                                 error:nil];
+        NSString *baseFileName = [[self fileURL] lastPathComponent];
+        NSString *fileName = [NSString stringWithFormat:@"%@ (%p)", [baseFileName stringByDeletingPathExtension], self];  // append a unique string to avoid overwriting another backup file with the same file name.
         
-        [super saveToURL:newURL ofType:typeName forSaveOperation:saveOperation completionHandler:^(NSError *error) {
-            fileAccessCompletionHandler();
-            completionHandler(error);
-        }];
-    }];
+        url = [[autosaveDirectoryURL URLByAppendingPathComponent:fileName] URLByAppendingPathExtension:[baseFileName pathExtension]];
+    }
+    
+    [super saveToURL:url ofType:typeName forSaveOperation:saveOperation delegate:delegate didSaveSelector:didSaveSelector contextInfo:contextInfo];
 }
 
 
